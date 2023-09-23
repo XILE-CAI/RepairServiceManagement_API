@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RepairServiceManagement.API.Data;
+using RepairServiceManagement.API.IRepository;
 using RepairServiceManagement.API.Models.RepairRequest;
 
 namespace RepairServiceManagement.API.Controllers
@@ -15,20 +16,21 @@ namespace RepairServiceManagement.API.Controllers
     [ApiController]
     public class RepairRequestsController : ControllerBase
     {
-        private readonly RepairServiceDbContext _context;
+        
         private readonly IMapper _mapper;
+        private readonly IRepairRequestsRepository _repairRequestsRepository;
 
-        public RepairRequestsController(RepairServiceDbContext context, IMapper mapper)
+        public RepairRequestsController(IMapper mapper, IRepairRequestsRepository repairRequestsRepository)
         {
-            _context = context;
             this._mapper = mapper;
+            this._repairRequestsRepository = repairRequestsRepository;
         }
 
         // GET: api/RepairRequests
         [HttpGet]
         public async Task<ActionResult<IEnumerable<GetRepairRequestsDto>>> GetRepairRequests()
         {
-            var repairRequests = await _context.RepairRequests.ToListAsync();
+            var repairRequests = await _repairRequestsRepository.GetAllAsync();
             return Ok(_mapper.Map<List<GetRepairRequestsDto>>(repairRequests));
         }
 
@@ -36,7 +38,7 @@ namespace RepairServiceManagement.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<GetRepairRequestDetailDto>> GetRepairRequest(int id)
         {
-            var repairRequest = await _context.RepairRequests.FindAsync(id);
+            var repairRequest = await _repairRequestsRepository.GetAsync(id);
 
             if (repairRequest == null)
             {
@@ -54,17 +56,25 @@ namespace RepairServiceManagement.API.Controllers
             {
                 return BadRequest();
             }
+            
+            //verify the repairRequest that need to be updated 
+            var repairRequest = await _repairRequestsRepository.GetAsync(id);
+            if (repairRequest == null)
+            {
+                return NotFound();
+            }
 
-            var repairRequest = _mapper.Map<RepairRequest>(updateRepairRequestDto);
-            _context.Entry(repairRequest).State = EntityState.Modified;
+            //map updateRepairRequestDto to repairRequest
+            //var updateRequest = _mapper.Map<RepairRequest>(updateRepairRequestDto);
+            _mapper.Map(updateRepairRequestDto, repairRequest);
 
             try
             {
-                await _context.SaveChangesAsync();
+                await _repairRequestsRepository.UpdateAsync(repairRequest);
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!RepairRequestExists(id))
+                if (!await RepairRequestExists(id))
                 {
                     return NotFound();
                 }
@@ -82,9 +92,9 @@ namespace RepairServiceManagement.API.Controllers
         public async Task<ActionResult<RepairRequest>> PostRepairRequest(CreateRepairRequestDto createRepairRequest)
         {
             var repairRequest = _mapper.Map<RepairRequest>(createRepairRequest);
-            _context.RepairRequests.Add(repairRequest);
-            await _context.SaveChangesAsync();
+            await _repairRequestsRepository.AddAsync(repairRequest);
 
+            //201 Created
             return CreatedAtAction("GetRepairRequest", new { id = repairRequest.Id }, repairRequest);
         }
 
@@ -92,21 +102,20 @@ namespace RepairServiceManagement.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRepairRequest(int id)
         {
-            var repairRequest = await _context.RepairRequests.FindAsync(id);
+            var repairRequest = await _repairRequestsRepository.GetAsync(id);
             if (repairRequest == null)
             {
                 return NotFound();
             }
 
-            _context.RepairRequests.Remove(repairRequest);
-            await _context.SaveChangesAsync();
+            await _repairRequestsRepository.DeleteAsync(id);
 
             return NoContent();
         }
 
-        private bool RepairRequestExists(int id)
+        private async Task<bool> RepairRequestExists(int id)
         {
-            return _context.RepairRequests.Any(e => e.Id == id);
+            return await _repairRequestsRepository.Exists(id);
         }
     }
 }

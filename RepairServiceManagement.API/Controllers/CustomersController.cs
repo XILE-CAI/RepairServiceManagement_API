@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RepairServiceManagement.API.Data;
+using RepairServiceManagement.API.IRepository;
 using RepairServiceManagement.API.Models.Customer;
 
 namespace RepairServiceManagement.API.Controllers
@@ -15,20 +16,20 @@ namespace RepairServiceManagement.API.Controllers
     [ApiController]
     public class CustomersController : ControllerBase
     {
-        private readonly RepairServiceDbContext _context;
         private readonly IMapper _mapper;
+        private readonly ICustomersRepository _customersRepository;
 
-        public CustomersController(RepairServiceDbContext context, IMapper mapper)
+        public CustomersController( IMapper mapper, ICustomersRepository customersRepository)
         {
-            _context = context;
             this._mapper = mapper;
+            this._customersRepository = customersRepository;
         }
 
         // GET: api/Customers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<GetCustomersDto>>> GetCustomers()
         {
-            var customers = await _context.Customers.ToListAsync();
+            var customers = await _customersRepository.GetAllAsync();
             return Ok(_mapper.Map<List<GetCustomersDto>>(customers));
         }
 
@@ -36,10 +37,12 @@ namespace RepairServiceManagement.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<GetCustomerDetailDto>> GetCustomer(int id)
         {
+            var customer = await _customersRepository.GetDetails(id); 
+
             //include list of repairRequests in Customer
-            var customer = await _context.Customers
+            /*var customer = await _context.Customers
                 .Include(c => c.RepairRequests)
-                .FirstOrDefaultAsync(c => c.Id == id);
+                .FirstOrDefaultAsync(c => c.Id == id);*/
 
             if (customer == null)
             {
@@ -60,18 +63,26 @@ namespace RepairServiceManagement.API.Controllers
                 return BadRequest();
             }
 
-            var customer = _mapper.Map<Customer>(updateCustomerDto);
+            //verify the customer that need to be updated
+            var customer = await _customersRepository.GetAsync(id);
+            if(customer == null)
+            {
+                return NotFound();
+            }
+
+            //var updateCustomer = _mapper.Map<Customer>(updateCustomerDto);
             //Set the state to indicate that it has been modified
-            _context.Entry(customer).State = EntityState.Modified;
+            //_context.Entry(customer).State = EntityState.Modified;
+
+            _mapper.Map(updateCustomerDto,customer);
 
             try
             {
-                // Save the changes to the database
-                await _context.SaveChangesAsync();
+                await _customersRepository.UpdateAsync(customer);
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!CustomerExists(id))
+                if (!await CustomerExists(id))
                 {
                     return NotFound();
                 }
@@ -91,10 +102,9 @@ namespace RepairServiceManagement.API.Controllers
         public async Task<ActionResult<Customer>> PostCustomer(CreateCustomerDto createCustomerDto)
         {
             var customer = _mapper.Map<Customer>(createCustomerDto);
-
-            _context.Customers.Add(customer);
-            await _context.SaveChangesAsync();
-
+            await _customersRepository.AddAsync(customer);
+            
+            //201 Created
             return CreatedAtAction("GetCustomer", new { id = customer.Id }, customer);
         }
 
@@ -102,21 +112,21 @@ namespace RepairServiceManagement.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCustomer(int id)
         {
-            var customer = await _context.Customers.FindAsync(id);
+            var customer = await _customersRepository.GetAsync(id);
             if (customer == null)
             {
                 return NotFound();
             }
 
-            _context.Customers.Remove(customer);
-            await _context.SaveChangesAsync();
+            await _customersRepository.DeleteAsync(id);
 
             return NoContent();
         }
 
-        private bool CustomerExists(int id)
+        private async Task<bool> CustomerExists(int id)
         {
-            return _context.Customers.Any(e => e.Id == id);
+            var customer = await _customersRepository.GetAsync(id);
+            return customer != null;
         }
     }
 }
