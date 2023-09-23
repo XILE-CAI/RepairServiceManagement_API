@@ -51,6 +51,7 @@ namespace RepairServiceManagement.API.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutCustomer(int id, Customer customer)
         {
+            //verify customer ID that need to be updated
             if (id != customer.Id)
             {
                 return BadRequest();
