@@ -48,13 +48,14 @@ namespace RepairServiceManagement.API.Controllers
 
         // PUT: api/RepairRequests/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutRepairRequest(int id, RepairRequest repairRequest)
+        public async Task<IActionResult> PutRepairRequest(int id, UpdateRepairRequestDto updateRepairRequestDto)
         {
-            if (id != repairRequest.Id)
+            if (id != updateRepairRequestDto.Id)
             {
                 return BadRequest();
             }
 
+            var repairRequest = _mapper.Map<RepairRequest>(updateRepairRequestDto);
             _context.Entry(repairRequest).State = EntityState.Modified;
 
             try

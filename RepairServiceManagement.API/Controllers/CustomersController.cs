@@ -36,7 +36,10 @@ namespace RepairServiceManagement.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<GetCustomerDetailDto>> GetCustomer(int id)
         {
-            var customer = await _context.Customers.FindAsync(id);
+            //include list of repairRequests in Customer
+            var customer = await _context.Customers
+                .Include(c => c.RepairRequests)
+                .FirstOrDefaultAsync(c => c.Id == id);
 
             if (customer == null)
             {
@@ -49,18 +52,21 @@ namespace RepairServiceManagement.API.Controllers
         // PUT: api/Customers/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutCustomer(int id, Customer customer)
+        public async Task<IActionResult> PutCustomer(int id, UpdateCustomerDto updateCustomerDto)
         {
             //verify customer ID that need to be updated
-            if (id != customer.Id)
+            if (id != updateCustomerDto.Id)
             {
                 return BadRequest();
             }
 
+            var customer = _mapper.Map<Customer>(updateCustomerDto);
+            //Set the state to indicate that it has been modified
             _context.Entry(customer).State = EntityState.Modified;
 
             try
             {
+                // Save the changes to the database
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
@@ -75,6 +81,7 @@ namespace RepairServiceManagement.API.Controllers
                 }
             }
 
+            //return 204
             return NoContent();
         }
 

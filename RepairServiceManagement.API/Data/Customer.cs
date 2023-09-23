@@ -1,4 +1,6 @@
-﻿namespace RepairServiceManagement.API.Data
+﻿using System;
+
+namespace RepairServiceManagement.API.Data
 {
     public class Customer
     {
@@ -9,7 +11,7 @@
         public string Email { get; set; }
         public string PhoneNumber { get; set; }
 
-
-        public IList<RepairRequest> RepairRequests { get; set; }
+        //lazy loading enabled by marking as virtual
+        public virtual IList<RepairRequest> RepairRequests { get; set; }
     }
 }
